@@ -11,22 +11,41 @@ app = Flask(__name__)
 
 # Load all environment variables from the .env file
 load_dotenv()
+github_access_token = os.getenv('GITHUB_ACCESS_TOKEN')
 
 # routes CRUD opperationer GET, POST, PUT, PATCH, DELETE
 
 # Function to fetch GitHub repository names for a specific user
 def fetch_github_repos(username):
-    url = f'https://api.github.com/users/{username}/repos'
-    req = requests.get(url)
-    j = req.json()
 
-    repo_names = [i['name'] for i in j]
-    return repo_names
+     # If you want to get the repos of the authenticated user, use the /user/repos endpoint
+    if username == 'SushiGirrl':
+        # This is where you want to include the authorization header to access private repos
+        headers = {'Authorization': f'token {github_access_token}' }
+        url = 'https://api.github.com/user/repos'  # Use /user/repos for authenticated user
+        req = requests.get(url, headers=headers)
+    else:
+        # Public repositories can be fetched directly
+        url = f'https://api.github.com/users/{username}/repos'
+        req = requests.get(url)
+
+    # Check if the request was successful
+    if req.status_code == 200:
+        j = req.json()
+        repo_names = [i['name'] for i in j]
+        return repo_names, 200  # 200 OK
+    else:
+        print(f"Error fetching repos for {username}: {req.status_code} {req.json()}")
+        return [], req.status_code  # Return the error status code
+
 
 @app.route('/members')
 def read_all():
     # Fetch the member data from the database
     members_data = readRandomDb()
+
+    if not members_data:  # If no members found, return 404
+        return jsonify({"error": "No members found"}), 404  # 404 Not Found
     
     # List to hold the data with GitHub repos
     response = []
@@ -35,12 +54,15 @@ def read_all():
     for member in members_data:
         github_username = member.get('github_username')
         if github_username:
-            member['github_repos'] = fetch_github_repos(github_username)
+            repos, status_code = fetch_github_repos(github_username)
+            if status_code != 200:
+                return jsonify({"error": f"Failed to fetch repos for {github_username}"}), status_code
+            member['github_repos'] = repos
         else:
             member['github_repos'] = []
         response.append(member)
 
-    return jsonify(response)
+    return jsonify(response), 200  # 200 OK
 
 '''
 @app.route('/members/', methods=['POST'])
@@ -50,7 +72,6 @@ def  create():
 
     return jsonify(create(data))
 '''
-
 
 # Function to update a specific member's GitHub username by ID
 @app.route('/members/update_username/<int:id>/<new_username>', methods=['PUT'])

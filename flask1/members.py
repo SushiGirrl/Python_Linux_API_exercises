@@ -47,9 +47,19 @@ def createRandomDatabase():
                     active TEXT,
                     github_username TEXT
                     )''')
-        cur.executemany('''INSERT INTO members Values (
+        
+        # Check if the table already has data
+        cur.execute('SELECT COUNT(*) FROM members')
+        count = cur.fetchone()[0]
+
+        if count == 0:
+            # Only insert data if the table is empty
+            cur.executemany('''INSERT INTO members VALUES (
                         :id,:first_name,:last_name,:birth_date,:gender,:email,
                         :phonenumber,:address,:nationality,:active,:github_username)''', random_users)
+            conn.commit()
+        else:
+            print("Table already has data, skipping insertion.")
         
 
 def readRandomDb():
@@ -67,6 +77,7 @@ def readRandomDb():
         
         return members
     
+
 new_github_usernames = [
     'bklieger-groq',
     'aaronjanse',
@@ -101,8 +112,11 @@ def updateGithubUsernames():
      conn.commit()
 
 
+
 createRandomDatabase()
+
 
 # Call the function to update the GitHub usernames
 updateGithubUsernames()
+
 print(readRandomDb())
